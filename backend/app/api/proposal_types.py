@@ -9,4 +9,13 @@ bp = Blueprint('proposal_types', __name__)
 def get_proposal_types(current_user):
     """Returns all available proposal types."""
     types = ProposalType.query.all()
-    return jsonify([{'id': t.id, 'name': t.name, 'description': t.description} for t in types])
+    return jsonify([
+        {
+            'id': t.id,
+            'name': t.name,
+            'description': t.description,
+            'workflow_id': t.workflow_id,
+            'season_id': t.season_id,
+        }
+        for t in types
+    ])

@@ -39,6 +39,9 @@ def create_app(config_class=Config):
     from app.api.proposal_types import bp as proposal_types_bp
     app.register_blueprint(proposal_types_bp, url_prefix='/api/proposal-types', strict_slashes=False)
 
+    from app.api.instruments import bp as instruments_bp
+    app.register_blueprint(instruments_bp, url_prefix='/api/instruments', strict_slashes=False)
+
     @app.route('/ping')
     def ping():
         return 'pong!'
