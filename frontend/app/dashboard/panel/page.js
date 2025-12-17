@@ -42,7 +42,7 @@ export default function PanelChairDashboard() {
         await refreshProposals();
       } catch (err) {
         console.error(err);
-        setError('无法获取提案信息，可能需要重新登录。');
+        setError('Unable to fetch proposal information. You may need to log in again.');
         if (err.status === 401) {
           localStorage.removeItem('token');
           router.push('/login');
@@ -68,7 +68,7 @@ export default function PanelChairDashboard() {
       }));
     } catch (err) {
       console.error(err);
-      setStatusMessage(err.info?.message || '获取可执行动作失败');
+      setStatusMessage(err.info?.message || 'Failed to fetch available actions');
       setTransitionMap((prev) => ({
         ...prev,
         [proposalId]: { loading: false, items: [] },
@@ -79,12 +79,12 @@ export default function PanelChairDashboard() {
   const handleTransition = async (proposalId, transitionName) => {
     try {
       await triggerProposalTransition(proposalId, { transition: transitionName });
-      setStatusMessage(`提案 ${proposalId} 已执行：${transitionName}`);
+      setStatusMessage(`Proposal ${proposalId} action executed: ${transitionName}`);
       await refreshProposals();
       await handleLoadTransitions(proposalId);
     } catch (err) {
       console.error(err);
-      setStatusMessage(err.info?.message || '执行动作失败');
+      setStatusMessage(err.info?.message || 'Failed to execute action');
     }
   };
 
@@ -95,9 +95,9 @@ export default function PanelChairDashboard() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-bold">评审主席控制台</h1>
+        <h1 className="text-3xl font-bold">Panel Chair Dashboard</h1>
         <p className="text-sm text-gray-600">
-          查看所有提案的阶段状态、仪器排程反馈，并可执行工作流动作。
+          View all proposals' phase status, instrument scheduling feedback, and execute workflow actions.
         </p>
       </header>
 
@@ -112,40 +112,40 @@ export default function PanelChairDashboard() {
               <header className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold">{proposal.title}</h2>
-                  <p className="text-xs text-gray-500">状态：{proposal.status}</p>
+                  <p className="text-xs text-gray-500">Status: {proposal.status}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleLoadTransitions(proposal.id)}
                   className="text-sm text-indigo-600 hover:text-indigo-800"
                 >
-                  {transitionState.loading ? '加载中…' : '刷新可执行动作'}
+                  {transitionState.loading ? 'Loading...' : 'Refresh Available Actions'}
                 </button>
               </header>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-gray-700">
                 <div>
-                  <h3 className="font-medium">阶段</h3>
+                  <h3 className="font-medium">Phases</h3>
                   <ul className="list-disc list-inside">
                     {proposal.phases.map((phase) => (
                       <li key={`${proposal.id}-phase-${phase.phase}`}>
-                        {phase.phase}：{phase.status}
+                        {phase.phase}: {phase.status}
                       </li>
                     ))}
                   </ul>
                 </div>
                 <div>
-                  <h3 className="font-medium">仪器进度</h3>
+                  <h3 className="font-medium">Instrument Progress</h3>
                   <ul className="list-disc list-inside">
                     {proposal.instruments.map((instrument) => (
                       <li key={`${proposal.id}-${instrument.instrument}`}>
-                        {instrument.instrument}：{instrument.status}
+                        {instrument.instrument}: {instrument.status}
                       </li>
                     ))}
                   </ul>
                 </div>
                 <div>
-                  <h3 className="font-medium">排程反馈概览</h3>
+                  <h3 className="font-medium">Scheduling Feedback Overview</h3>
                   <pre className="bg-gray-100 rounded p-3 text-xs overflow-x-auto">
                     {JSON.stringify(
                       proposal.instruments.reduce((acc, inst) => {
@@ -160,7 +160,7 @@ export default function PanelChairDashboard() {
               </div>
 
               <div className="border-t pt-3">
-                <h3 className="text-sm font-medium text-gray-700">可执行工作流动作</h3>
+                <h3 className="text-sm font-medium text-gray-700">Available Workflow Actions</h3>
                 {transitionState.items.length ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {transitionState.items.map((transition) => (
@@ -175,7 +175,7 @@ export default function PanelChairDashboard() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-500">暂无可执行动作，或尚未加载。</p>
+                  <p className="text-xs text-gray-500">No available actions, or not yet loaded.</p>
                 )}
               </div>
             </div>
@@ -185,4 +185,3 @@ export default function PanelChairDashboard() {
     </div>
   );
 }
-

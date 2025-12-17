@@ -53,7 +53,7 @@ export default function Dashboard() {
         }
       } catch (err) {
         console.error(err);
-        setError('数据获取失败，可能需要重新登录。');
+        setError('Failed to fetch data. You may need to log in again.');
         if (err.status === 401) {
             localStorage.removeItem('token');
             router.push('/login');
@@ -77,7 +77,7 @@ export default function Dashboard() {
         setInstrumentQueue(data);
       } catch (err) {
         console.error(err);
-        setError('获取仪器排程队列失败');
+        setError('Failed to fetch instrument scheduling queue');
       }
     };
     loadInstrumentQueue();
@@ -115,7 +115,7 @@ export default function Dashboard() {
     }
     const draft = feedbackDrafts[proposalId];
     if (!draft) {
-      setFeedbackMessage('请填写反馈信息');
+      setFeedbackMessage('Please fill in the feedback information');
       return;
     }
 
@@ -125,12 +125,12 @@ export default function Dashboard() {
         comment: draft.comment,
         payload: draft.payload,
       });
-      setFeedbackMessage('反馈已提交');
+      setFeedbackMessage('Feedback submitted');
       const data = await getProposals({ instrument_code: selectedInstrument });
       setInstrumentQueue(data);
     } catch (err) {
       console.error(err);
-      setFeedbackMessage(err.info?.message || '提交反馈失败');
+      setFeedbackMessage(err.info?.message || 'Failed to submit feedback');
     }
   };
 
@@ -141,20 +141,20 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-3xl font-bold">欢迎，{user ? user.username : '用户'}</h1>
-        <p className="text-sm text-gray-600">角色：{user?.roles?.join(', ')}</p>
+        <h1 className="text-3xl font-bold">Welcome, {user ? user.username : 'User'}</h1>
+        <p className="text-sm text-gray-600">Roles: {user?.roles?.join(', ')}</p>
       </header>
 
       {error && <p className="text-red-500 bg-red-100 p-3 rounded mb-4">{error}</p>}
 
       <section className="bg-white shadow-md rounded p-6 space-y-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">我的提案</h2>
+          <h2 className="text-xl font-semibold">My Proposals</h2>
           <Link
             href="/proposals/new"
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded"
           >
-            创建 Phase 1 提案
+            Create Phase 1 Proposal
             </Link>
         </div>
 
@@ -170,21 +170,21 @@ export default function Dashboard() {
                 </p>
                 <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
                   <div>
-                    <h4 className="font-medium">阶段进度</h4>
+                    <h4 className="font-medium">Phase Progress</h4>
                     <ul className="list-disc list-inside">
                       {proposal.phases.map((phase) => (
                         <li key={`${proposal.id}-${phase.phase}`}>
-                          {phase.phase}：{phase.status}
+                          {phase.phase}: {phase.status}
                         </li>
                       ))}
                     </ul>
                   </div>
                   <div>
-                    <h4 className="font-medium">涉及仪器</h4>
+                    <h4 className="font-medium">Instruments</h4>
                     <ul className="list-disc list-inside">
                       {proposal.instruments.map((inst) => (
                         <li key={`${proposal.id}-${inst.instrument}`}>
-                          {inst.instrument}：{inst.status}
+                          {inst.instrument}: {inst.status}
                         </li>
                       ))}
                     </ul>
@@ -194,14 +194,14 @@ export default function Dashboard() {
             ))}
           </ul>
         ) : (
-          <p>尚未创建提案。</p>
+          <p>No proposals created yet.</p>
         )}
       </section>
 
       {(isScheduler || isAdmin) && (
         <section className="bg-white shadow-md rounded p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">仪器排程工作台</h2>
+            <h2 className="text-xl font-semibold">Instrument Scheduling Workbench</h2>
             <select
               value={selectedInstrument}
               onChange={(evt) => setSelectedInstrument(evt.target.value)}
@@ -215,7 +215,7 @@ export default function Dashboard() {
             </select>
           </div>
 
-          {!instrumentQueue.length && <p className="text-sm text-gray-500">暂无待排程提案。</p>}
+          {!instrumentQueue.length && <p className="text-sm text-gray-500">No proposals pending scheduling.</p>}
           {instrumentQueue.length > 0 && (
             <div className="space-y-6">
               {instrumentQueue.map((proposal) => {
@@ -225,14 +225,14 @@ export default function Dashboard() {
                     <header className="flex items-center justify-between">
                       <div>
                         <p className="font-semibold">{proposal.title}</p>
-                        <p className="text-xs text-gray-500">状态：{proposal.status}</p>
+                        <p className="text-xs text-gray-500">Status: {proposal.status}</p>
                       </div>
                       <span className="text-xs font-mono bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">
-                        阶段：{proposal.assignment?.status || '未开始'}
+                        Phase: {proposal.assignment?.status || 'Not started'}
                       </span>
                     </header>
                     <div className="mt-3 text-sm text-gray-700">
-                      <p className="font-medium">提案方提交的表单数据：</p>
+                      <p className="font-medium">Form data submitted by proposer:</p>
                       <pre className="bg-gray-100 rounded p-3 overflow-x-auto text-xs mt-2">
                         {JSON.stringify(proposal.assignment?.form_data || {}, null, 2)}
                       </pre>
@@ -240,29 +240,29 @@ export default function Dashboard() {
 
                     <div className="mt-4 space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">排程状态</label>
+                        <label className="block text-sm font-medium text-gray-700">Scheduling Status</label>
                         <select
                           value={draft.status}
                           onChange={(evt) => handleFeedbackChange(proposal.id, 'status', evt.target.value)}
                           className="mt-1 border border-gray-300 rounded px-3 py-2"
                         >
-                          <option value="under_assessment">评估中</option>
-                          <option value="scheduled">已排程</option>
-                          <option value="needs_revision">需修改</option>
+                          <option value="under_assessment">Under Assessment</option>
+                          <option value="scheduled">Scheduled</option>
+                          <option value="needs_revision">Needs Revision</option>
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">可观测窗口</label>
+                        <label className="block text-sm font-medium text-gray-700">Visibility Window</label>
                         <input
                           type="text"
                           value={draft.payload?.visibility_window || ''}
                           onChange={(evt) => handleFeedbackPayloadChange(proposal.id, 'visibility_window', evt.target.value)}
                           className="mt-1 w-full border border-gray-300 rounded px-3 py-2"
-                          placeholder="示例：2025-05-01 ~ 2025-05-07"
+                          placeholder="e.g., 2025-05-01 ~ 2025-05-07"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">资源占用说明</label>
+                        <label className="block text-sm font-medium text-gray-700">Resource Notes</label>
                         <textarea
                           rows={3}
                           value={draft.payload?.resource_notes || ''}
@@ -271,7 +271,7 @@ export default function Dashboard() {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">评估备注</label>
+                        <label className="block text-sm font-medium text-gray-700">Assessment Comments</label>
                         <textarea
                           rows={3}
                           value={draft.comment || ''}
@@ -285,7 +285,7 @@ export default function Dashboard() {
                           onClick={() => submitFeedback(proposal.id)}
                           className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded"
                         >
-                          提交排程结果
+                          Submit Scheduling Result
                         </button>
                       </div>
                     </div>

@@ -22,17 +22,18 @@ AstroPropose 是一个通用且可定制的天文观测提案管理框架，基�
 - **数据库**: PostgreSQL (远程服务器)
 - **ORM**: SQLAlchemy 1.4.39
 - **认证**: PyJWT 2.4.0
-- **API**: RESTful API设计
+- **包管理**: [uv](https://github.com/astral-sh/uv)
 
 ### 前端
 - **框架**: Next.js 13.4.12
 - **UI库**: React 18.2.0
 - **样式**: Tailwind CSS 3.3.3
-- **工作流**: ReactFlow 11.7.4
+- **工作流**: XyFlow (@xyflow/react) 12.0.0+
 
 ## 系统要求
 
-- Python 3.8+
+- Python 3.12+
+- [uv](https://github.com/astral-sh/uv) ≥ 0.5.0
 - Node.js v18+
 - PostgreSQL 服务器访问权限
 
@@ -44,21 +45,15 @@ git clone <repository-url>
 cd src
 ```
 
-### 2. 后端设置
+### 2. 后端设置（uv）
 
-#### 环境准备
+#### 环境准备与依赖安装
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或
-venv\Scripts\activate  # Windows
+uv sync
 ```
 
-#### 安装依赖
-```bash
-pip install -r requirements.txt
-```
+上述命令会下载依赖并创建 uv 托管的 `.venv/`。后续可通过 `uv run ...` 直接执行命令，也可手动激活 `.venv`。
 
 #### 环境变量配置
 复制环境变量模板文件并配置您的设置：
@@ -83,7 +78,7 @@ flask seed
 
 #### 启动后端服务
 ```bash
-flask run --port 5001
+uv run flask run --port 5001
 ```
 
 后端API将在 `http://localhost:5001` 可用。
@@ -141,7 +136,7 @@ src/
 │   │   ├── models/         # 数据库模型
 │   │   └── core/           # 核心业务逻辑
 │   ├── migrations/         # 数据库迁移文件
-│   └── requirements.txt    # Python依赖
+│   └── pyproject.toml      # 使用 uv 管理的 Python 依赖
 ├── frontend/               # Next.js前端应用
 │   ├── app/               # 页面组件
 │   │   ├── admin/         # 管理员页面

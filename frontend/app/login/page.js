@@ -17,6 +17,10 @@ export default function LoginPage() {
       const data = await login({ username, password });
       if (data.token) {
         localStorage.setItem('token', data.token);
+        // 触发认证状态变更事件
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('auth-change'));
+        }
         router.push('/dashboard');
       }
     } catch (err) {

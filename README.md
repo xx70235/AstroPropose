@@ -22,17 +22,18 @@ AstroPropose is a general and customizable framework for astronomical observing 
 - **Database**: PostgreSQL (Remote Server)
 - **ORM**: SQLAlchemy 1.4.39
 - **Authentication**: PyJWT 2.4.0
-- **API**: RESTful API Design
+- **Package Manager**: [uv](https://github.com/astral-sh/uv)
 
 ### Frontend
 - **Framework**: Next.js 13.4.12
 - **UI Library**: React 18.2.0
 - **Styling**: Tailwind CSS 3.3.3
-- **Workflow**: ReactFlow 11.7.4
+- **Workflow**: XyFlow (@xyflow/react) 12.0.0+
 
 ## System Requirements
 
-- Python 3.8+
+- Python 3.12+
+- [uv](https://github.com/astral-sh/uv) ≥ 0.5.0
 - Node.js v18+
 - PostgreSQL server access
 
@@ -44,21 +45,15 @@ git clone <repository-url>
 cd src
 ```
 
-### 2. Backend Setup
+### 2. Backend Setup (uv)
 
-#### Environment Preparation
+#### Environment Preparation & Dependency Installation
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate  # Windows
+uv sync
 ```
 
-#### Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+The command will create a `.venv/` managed by uv (or use `UV_PROJECT_ENVIRONMENT=.venv` to customise). Afterwards you can run backend scripts via `uv run ...` or by activating `.venv`.
 
 #### Environment Variables Configuration
 Copy the environment variables template and configure your settings:
@@ -83,7 +78,7 @@ flask seed
 
 #### Start Backend Server
 ```bash
-flask run --port 5001
+uv run flask run --port 5001
 ```
 
 The backend API will be available at `http://localhost:5001`.
@@ -141,7 +136,7 @@ src/
 │   │   ├── models/         # Database Models
 │   │   └── core/           # Core Business Logic
 │   ├── migrations/         # Database Migration Files
-│   └── requirements.txt    # Python Dependencies
+│   └── pyproject.toml      # Python Dependencies managed by uv
 ├── frontend/               # Next.js Frontend Application
 │   ├── app/               # Page Components
 │   │   ├── admin/         # Admin Pages

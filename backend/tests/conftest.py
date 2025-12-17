@@ -1,4 +1,5 @@
 import pytest
+import os
 
 from app import create_app, db
 from app.models.models import (
@@ -14,7 +15,10 @@ from app.models.models import (
 
 class TestConfig:
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    # 使用文件系统的SQLite数据库，便于调试
+    # 数据库文件会在测试目录下创建
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(basedir, 'test.db')}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = "test-secret"
     WTF_CSRF_ENABLED = False

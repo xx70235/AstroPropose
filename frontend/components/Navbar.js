@@ -10,7 +10,7 @@ const Navbar = () => {
   const router = useRouter();
 
   useEffect(() => {
-    const init = async () => {
+    const checkAuth = async () => {
       if (typeof window === 'undefined') {
         return;
       }
@@ -22,20 +22,35 @@ const Navbar = () => {
           const me = await getCurrentUser();
           setRoles(me.roles || []);
         } catch (err) {
-          console.error(err);
+          console.error('Failed to get user data:', err);
           setRoles([]);
+          setIsLoggedIn(false);
+          localStorage.removeItem('token');
         }
       } else {
         setRoles([]);
       }
     };
-    init();
+
+    checkAuth();
+
+    // 监听自定义登录事件
+    const handleAuthChange = () => {
+      checkAuth();
+    };
+    
+    window.addEventListener('auth-change', handleAuthChange);
+    
+    return () => {
+      window.removeEventListener('auth-change', handleAuthChange);
+    };
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     setIsLoggedIn(false);
     setRoles([]);
+    window.dispatchEvent(new Event('auth-change'));
     router.push('/login');
   };
 
@@ -59,11 +74,28 @@ const Navbar = () => {
               Panel
             </Link>
           )}
-          <Link href="/admin/workflows" className="px-3 py-2 rounded hover:bg-gray-700">
-            Admin
-          </Link>
+          {(roles.includes('Admin')) && (
+            <>
+              <Link href="/admin/instruments" className="px-3 py-2 rounded hover:bg-gray-700">
+                Instruments
+              </Link>
+              <Link href="/admin/workflows" className="px-3 py-2 rounded hover:bg-gray-700">
+                Workflows
+              </Link>
+              <Link href="/admin/forms" className="px-3 py-2 rounded hover:bg-gray-700">
+                Forms
+              </Link>
+              <Link href="/admin/external-tools" className="px-3 py-2 rounded hover:bg-gray-700">
+                🔌 Tools
+              </Link>
+            </>
+          )}
           {isLoggedIn ? (
-            <button onClick={handleLogout} className="px-3 py-2 rounded hover:bg-gray-700">
+            <button
+              onClick={handleLogout}
+              className="px-3 py-2 rounded hover:bg-gray-700 bg-red-600 hover:bg-red-700"
+              title="Click to logout"
+            >
               Logout
             </button>
           ) : (

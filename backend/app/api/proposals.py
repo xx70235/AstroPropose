@@ -136,17 +136,17 @@ def create_proposal(current_user):
         if attachments:
             payload_data = dict(payload_data)
             payload_data['__attachments__'] = attachments
-        phase = ProposalPhase(
-            proposal=proposal,
+    phase = ProposalPhase(
+        proposal=proposal,
             phase=phase_name,
             status=status,
-            opened_at=datetime.utcnow(),
+        opened_at=datetime.utcnow(),
             submitted_at=submitted,
             payload=payload_data,
             notes=phase_data.get('notes'),
             deadline=deadline,
-        )
-        db.session.add(phase)
+    )
+    db.session.add(phase)
 
     # Instrument entries
     instruments_payload = data.get('instruments', [])
@@ -356,7 +356,28 @@ def trigger_transition(current_user, id):
             actor=current_user,
             context=data.get('context', {}),
         )
-    except (PermissionError, ValueError) as exc:
-        return jsonify({'message': str(exc)}), 400
+    except PermissionError as exc:
+        return jsonify({
+            'message': str(exc),
+            'error_type': 'permission_denied'
+        }), 403
+    except ValueError as exc:
+        # 检查是否是验证错误
+        error_msg = str(exc)
+        if 'Validation failed' in error_msg or 'validation' in error_msg.lower():
+            return jsonify({
+                'message': error_msg,
+                'error_type': 'validation_failed',
+                'details': error_msg.split('\n')[1:] if '\n' in error_msg else []
+            }), 400
+        return jsonify({
+            'message': error_msg,
+            'error_type': 'workflow_error'
+        }), 400
+    except Exception as exc:
+        return jsonify({
+            'message': f'Unexpected error: {str(exc)}',
+            'error_type': 'internal_error'
+        }), 500
 
     return jsonify(result)

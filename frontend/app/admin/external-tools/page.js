@@ -1,0 +1,971 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  listExternalTools,
+  getExternalTool,
+  createExternalTool,
+  updateExternalTool,
+  refreshExternalToolSpec,
+  createToolOperation,
+  updateToolOperation,
+  testToolOperation,
+} from '@/lib/api';
+
+const AUTH_TYPES = [
+  { value: 'none', label: 'No Authentication' },
+  { value: 'api_key', label: 'API Key' },
+  { value: 'bearer', label: 'Bearer Token' },
+  { value: 'basic', label: 'Basic Auth' },
+];
+
+export default function ExternalToolsPage() {
+  const router = useRouter();
+  const [tools, setTools] = useState([]);
+  const [selectedTool, setSelectedTool] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // New tool form
+  const [showNewToolForm, setShowNewToolForm] = useState(false);
+  const [newTool, setNewTool] = useState({
+    name: '',
+    description: '',
+    base_url: '',
+    openapi_spec_url: '',
+    auth_type: 'none',
+    auth_config: {},
+  });
+
+  // Test operation form
+  const [testingOperation, setTestingOperation] = useState(null);
+  const [testParams, setTestParams] = useState({});
+  const [testResult, setTestResult] = useState(null);
+
+  // New operation form
+  const [showNewOperationForm, setShowNewOperationForm] = useState(false);
+  const [newOperation, setNewOperation] = useState({
+    operation_id: '',
+    name: '',
+    description: '',
+    method: 'POST',
+    path: '',
+    parameters: {},
+    request_body: {},
+    response_schema: {},
+    input_mapping: {},
+    output_mapping: {},
+    timeout: 30,
+    retry_config: {},
+    tool_type: 'other',
+    validation_config: {
+      block_on_failure: true,
+      block_on_service_error: false,
+      failure_conditions: [],
+      error_message_template: 'Validation failed',
+    },
+  });
+
+  useEffect(() => {
+    fetchTools();
+  }, []);
+
+  const fetchTools = async () => {
+    try {
+      setLoading(true);
+      const data = await listExternalTools();
+      setTools(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchToolDetails = async (toolId) => {
+    try {
+      const data = await getExternalTool(toolId);
+      setSelectedTool(data);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleCreateTool = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    try {
+      await createExternalTool(newTool);
+      setSuccess('Tool registered successfully!');
+      setShowNewToolForm(false);
+      setNewTool({
+        name: '',
+        description: '',
+        base_url: '',
+        openapi_spec_url: '',
+        auth_type: 'none',
+        auth_config: {},
+      });
+      fetchTools();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleRefreshSpec = async (toolId) => {
+    try {
+      setError('');
+      const result = await refreshExternalToolSpec(toolId);
+      setSuccess(`Spec refreshed! ${result.operations_imported} operations imported.`);
+      fetchToolDetails(toolId);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleTestOperation = async (operation) => {
+    setTestingOperation(operation);
+    setTestParams({});
+    setTestResult(null);
+  };
+
+  const executeTest = async () => {
+    try {
+      setError('');
+      const result = await testToolOperation(testingOperation.id, testParams);
+      setTestResult(result);
+    } catch (err) {
+      setTestResult({ success: false, error: err.message });
+    }
+  };
+
+  const handleCreateOperation = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    try {
+      await createToolOperation(selectedTool.id, newOperation);
+      setSuccess('Operation created successfully!');
+      setShowNewOperationForm(false);
+      setNewOperation({
+        operation_id: '',
+        name: '',
+        description: '',
+        method: 'POST',
+        path: '',
+        parameters: {},
+        request_body: {},
+        response_schema: {},
+        input_mapping: {},
+        output_mapping: {},
+        timeout: 30,
+        retry_config: {},
+        tool_type: 'other',
+        validation_config: {
+          block_on_failure: true,
+          block_on_service_error: false,
+          failure_conditions: [],
+          error_message_template: 'Validation failed',
+        },
+      });
+      fetchToolDetails(selectedTool.id);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-8 text-center">Loading external tools...</div>;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">External Tools</h1>
+            <p className="text-gray-600 mt-1">
+              Register and manage external API integrations for workflow automation
+            </p>
+          </div>
+          <button
+            onClick={() => setShowNewToolForm(true)}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+          >
+            + Register New Tool
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
+            {success}
+          </div>
+        )}
+
+        {/* New Tool Form Modal */}
+        {showNewToolForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-bold mb-4">Register External Tool</h2>
+              
+              <form onSubmit={handleCreateTool} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Tool Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newTool.name}
+                    onChange={(e) => setNewTool({ ...newTool, name: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="e.g., TAC Notification Service"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Description</label>
+                  <textarea
+                    value={newTool.description}
+                    onChange={(e) => setNewTool({ ...newTool, description: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    rows={2}
+                    placeholder="Brief description of what this tool does"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Base URL *</label>
+                  <input
+                    type="url"
+                    required
+                    value={newTool.base_url}
+                    onChange={(e) => setNewTool({ ...newTool, base_url: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="https://api.example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    OpenAPI Spec URL (optional)
+                  </label>
+                  <input
+                    type="url"
+                    value={newTool.openapi_spec_url}
+                    onChange={(e) => setNewTool({ ...newTool, openapi_spec_url: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="https://api.example.com/openapi.json"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    If provided, operations will be automatically imported from the spec. 
+                    You can also manually add operations after registering the tool.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Authentication Type</label>
+                  <select
+                    value={newTool.auth_type}
+                    onChange={(e) => setNewTool({ ...newTool, auth_type: e.target.value, auth_config: {} })}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    {AUTH_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {newTool.auth_type === 'bearer' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Bearer Token</label>
+                    <input
+                      type="password"
+                      value={newTool.auth_config.token || ''}
+                      onChange={(e) =>
+                        setNewTool({
+                          ...newTool,
+                          auth_config: { ...newTool.auth_config, token: e.target.value },
+                        })
+                      }
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Enter bearer token"
+                    />
+                  </div>
+                )}
+
+                {newTool.auth_type === 'api_key' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Header Name</label>
+                      <input
+                        type="text"
+                        value={newTool.auth_config.key_name || 'X-API-Key'}
+                        onChange={(e) =>
+                          setNewTool({
+                            ...newTool,
+                            auth_config: { ...newTool.auth_config, key_name: e.target.value },
+                          })
+                        }
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">API Key</label>
+                      <input
+                        type="password"
+                        value={newTool.auth_config.key_value || ''}
+                        onChange={(e) =>
+                          setNewTool({
+                            ...newTool,
+                            auth_config: { ...newTool.auth_config, key_value: e.target.value },
+                          })
+                        }
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {newTool.auth_type === 'basic' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Username</label>
+                      <input
+                        type="text"
+                        value={newTool.auth_config.username || ''}
+                        onChange={(e) =>
+                          setNewTool({
+                            ...newTool,
+                            auth_config: { ...newTool.auth_config, username: e.target.value },
+                          })
+                        }
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Password</label>
+                      <input
+                        type="password"
+                        value={newTool.auth_config.password || ''}
+                        onChange={(e) =>
+                          setNewTool({
+                            ...newTool,
+                            auth_config: { ...newTool.auth_config, password: e.target.value },
+                          })
+                        }
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowNewToolForm(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                  >
+                    Register Tool
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Tools Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {tools.map((tool) => (
+            <div
+              key={tool.id}
+              className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition cursor-pointer"
+              onClick={() => fetchToolDetails(tool.id)}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">{tool.name}</h3>
+                  <p className="text-sm text-gray-500 mt-1">{tool.description || 'No description'}</p>
+                </div>
+                <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded">
+                  {tool.auth_type}
+                </span>
+              </div>
+              <div className="mt-4 text-sm text-gray-600">
+                <p className="truncate">
+                  <span className="font-medium">Base URL:</span> {tool.base_url}
+                </p>
+                <p className="mt-1">
+                  <span className="font-medium">Operations:</span> {tool.operations_count}
+                </p>
+              </div>
+            </div>
+          ))}
+
+          {tools.length === 0 && (
+            <div className="col-span-full text-center py-12 text-gray-500">
+              No external tools registered yet. Click "Register New Tool" to add one.
+            </div>
+          )}
+        </div>
+
+        {/* Tool Details Modal */}
+        {selectedTool && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">{selectedTool.name}</h2>
+                  <p className="text-gray-600">{selectedTool.base_url}</p>
+                </div>
+                <button
+                  onClick={() => setSelectedTool(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {selectedTool.openapi_spec_url && (
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">OpenAPI Spec</p>
+                      <p className="text-xs text-blue-600 truncate">{selectedTool.openapi_spec_url}</p>
+                    </div>
+                    <button
+                      onClick={() => handleRefreshSpec(selectedTool.id)}
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Refresh Spec
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Operations ({selectedTool.operations?.length || 0})</h3>
+                <button
+                  onClick={() => setShowNewOperationForm(true)}
+                  className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                >
+                  + Add Operation
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {selectedTool.operations?.map((op) => (
+                  <div key={op.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 text-xs font-mono rounded ${
+                            op.method === 'GET' ? 'bg-green-100 text-green-800' :
+                            op.method === 'POST' ? 'bg-blue-100 text-blue-800' :
+                            op.method === 'PUT' ? 'bg-yellow-100 text-yellow-800' :
+                            op.method === 'DELETE' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {op.method}
+                          </span>
+                          <span className="font-mono text-sm">{op.path}</span>
+                        </div>
+                        <p className="text-sm font-medium mt-1">{op.name}</p>
+                        {op.description && (
+                          <p className="text-xs text-gray-500 mt-1">{op.description}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleTestOperation(op)}
+                          className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                        >
+                          Test
+                        </button>
+                        <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                          ID: {op.id}
+                        </span>
+                      </div>
+                    </div>
+
+                    {op.input_mapping && Object.keys(op.input_mapping).length > 0 && (
+                      <div className="mt-3 p-2 bg-gray-50 rounded text-xs">
+                        <span className="font-medium">Input Mapping:</span>
+                        <pre className="mt-1 overflow-x-auto">
+                          {JSON.stringify(op.input_mapping, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {selectedTool.operations?.length === 0 && (
+                  <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                    <p className="text-gray-500 mb-2">No operations defined yet.</p>
+                    <p className="text-sm text-gray-400">
+                      {selectedTool.openapi_spec_url
+                        ? 'Click "Refresh Spec" to import from OpenAPI, or "Add Operation" to create manually.'
+                        : 'Click "Add Operation" to manually configure an API endpoint.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 p-4 bg-yellow-50 rounded-lg">
+                <h4 className="font-medium text-yellow-800">Usage in Workflow</h4>
+                <p className="text-sm text-yellow-700 mt-1">
+                  To use an operation in a workflow transition, add it to the transition's "effects" configuration:
+                </p>
+                <pre className="mt-2 p-2 bg-white rounded text-xs overflow-x-auto">
+{`"effects": {
+  "external_tools": [
+    {
+      "operation_id": ${selectedTool.operations?.[0]?.id || 'OPERATION_ID'},
+      "async": false,
+      "on_failure": "continue"
+    }
+  ]
+}`}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Test Operation Modal */}
+        {testingOperation && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-bold mb-4">Test Operation: {testingOperation.name}</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">
+                  {testingOperation.method} {testingOperation.path}
+                </span>
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Test Parameters (JSON)</label>
+                  <textarea
+                    value={JSON.stringify(testParams, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setTestParams(JSON.parse(e.target.value));
+                      } catch {}
+                    }}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                    rows={8}
+                    placeholder={`{
+  "path": {},
+  "query": {},
+  "body": {}
+}`}
+                  />
+                </div>
+
+                {testResult && (
+                  <div className={`p-4 rounded-lg ${testResult.success ? 'bg-green-50' : 'bg-red-50'}`}>
+                    <h4 className={`font-medium ${testResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                      {testResult.success ? '✓ Success' : '✕ Failed'}
+                    </h4>
+                    {testResult.status_code && (
+                      <p className="text-sm mt-1">Status: {testResult.status_code}</p>
+                    )}
+                    {testResult.error && (
+                      <p className="text-sm text-red-600 mt-1">{testResult.error}</p>
+                    )}
+                    {testResult.response && (
+                      <pre className="mt-2 p-2 bg-white rounded text-xs overflow-x-auto max-h-60">
+                        {JSON.stringify(testResult.response, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setTestingOperation(null);
+                    setTestResult(null);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={executeTest}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                >
+                  Execute Test
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* New Operation Form Modal */}
+        {showNewOperationForm && selectedTool && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl font-bold mb-4">Add New Operation</h2>
+              
+              <form onSubmit={handleCreateOperation} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Operation ID *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newOperation.operation_id}
+                      onChange={(e) => setNewOperation({ ...newOperation, operation_id: e.target.value })}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                      placeholder="e.g., createNotification"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Unique identifier for this operation</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newOperation.name}
+                      onChange={(e) => setNewOperation({ ...newOperation, name: e.target.value })}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                      placeholder="e.g., Create Notification"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Description</label>
+                  <textarea
+                    value={newOperation.description}
+                    onChange={(e) => setNewOperation({ ...newOperation, description: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    rows={2}
+                    placeholder="Brief description of what this operation does"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">HTTP Method *</label>
+                    <select
+                      required
+                      value={newOperation.method}
+                      onChange={(e) => setNewOperation({ ...newOperation, method: e.target.value })}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="GET">GET</option>
+                      <option value="POST">POST</option>
+                      <option value="PUT">PUT</option>
+                      <option value="PATCH">PATCH</option>
+                      <option value="DELETE">DELETE</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Path *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newOperation.path}
+                      onChange={(e) => setNewOperation({ ...newOperation, path: e.target.value })}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                      placeholder="/api/notifications"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Use {'{param}'} for path parameters, e.g., /api/users/{'{id}'}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Tool Type *</label>
+                  <select
+                    required
+                    value={newOperation.tool_type}
+                    onChange={(e) => {
+                      const toolType = e.target.value;
+                      setNewOperation({
+                        ...newOperation,
+                        tool_type: toolType,
+                        // 如果是验证类工具，初始化验证配置
+                        validation_config: toolType === 'validation' ? {
+                          block_on_failure: true,
+                          block_on_service_error: false,
+                          failure_conditions: [],
+                          error_message_template: 'Validation failed',
+                        } : newOperation.validation_config,
+                      });
+                    }}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="other">Other</option>
+                    <option value="validation">Validation (e.g., visibility check)</option>
+                    <option value="notification">Notification</option>
+                    <option value="data_processing">Data Processing</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Validation tools can block workflow transitions if checks fail (e.g., target not visible)
+                  </p>
+                </div>
+
+                {newOperation.tool_type === 'validation' && (
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 className="text-sm font-semibold text-blue-900 mb-3">Validation Configuration</h4>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={newOperation.validation_config.block_on_failure}
+                          onChange={(e) => setNewOperation({
+                            ...newOperation,
+                            validation_config: {
+                              ...newOperation.validation_config,
+                              block_on_failure: e.target.checked,
+                            },
+                          })}
+                          className="mr-2"
+                        />
+                        <label className="text-sm text-gray-700">
+                          Block workflow transition if validation fails
+                        </label>
+                      </div>
+
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={newOperation.validation_config.block_on_service_error}
+                          onChange={(e) => setNewOperation({
+                            ...newOperation,
+                            validation_config: {
+                              ...newOperation.validation_config,
+                              block_on_service_error: e.target.checked,
+                            },
+                          })}
+                          className="mr-2"
+                        />
+                        <label className="text-sm text-gray-700">
+                          Block workflow transition if service is unavailable
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Failure Conditions (JSON)
+                        </label>
+                        <p className="text-xs text-gray-500 mb-1">
+                          Define when validation fails. Example: {'[{"path": "response.visible", "operator": "==", "value": false}]'}
+                        </p>
+                        <textarea
+                          value={JSON.stringify(newOperation.validation_config.failure_conditions, null, 2)}
+                          onChange={(e) => {
+                            try {
+                              const conditions = JSON.parse(e.target.value);
+                              setNewOperation({
+                                ...newOperation,
+                                validation_config: {
+                                  ...newOperation.validation_config,
+                                  failure_conditions: conditions,
+                                },
+                              });
+                            } catch {}
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                          rows={4}
+                          placeholder='[{"path": "response.visible", "operator": "==", "value": false}]'
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Error Message Template
+                        </label>
+                        <p className="text-xs text-gray-500 mb-1">
+                          Use {'{response.field}'} to reference response fields
+                        </p>
+                        <input
+                          type="text"
+                          value={newOperation.validation_config.error_message_template}
+                          onChange={(e) => setNewOperation({
+                            ...newOperation,
+                            validation_config: {
+                              ...newOperation.validation_config,
+                              error_message_template: e.target.value,
+                            },
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="Target is not visible: {response.reason}"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Parameters (JSON)</label>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Define query, path, and header parameters. Format: {'{"query": [{"name": "param", "required": true, "schema": {"type": "string"}}], "path": [], "header": []}'}
+                  </p>
+                  <textarea
+                    value={JSON.stringify(newOperation.parameters, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setNewOperation({ ...newOperation, parameters: JSON.parse(e.target.value) });
+                      } catch {}
+                    }}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                    rows={6}
+                    placeholder='{"query": [], "path": [], "header": []}'
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Request Body Schema (JSON)</label>
+                  <p className="text-xs text-gray-500 mb-1">
+                    JSON Schema for request body. Leave empty for GET/DELETE requests.
+                  </p>
+                  <textarea
+                    value={JSON.stringify(newOperation.request_body, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setNewOperation({ ...newOperation, request_body: JSON.parse(e.target.value) });
+                      } catch {}
+                    }}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                    rows={6}
+                    placeholder='{"type": "object", "properties": {"message": {"type": "string"}}}'
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Input Mapping (JSON, optional)</label>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Map proposal/context data to request parameters. Format: {'{"body.message": "context.notification_message", "query.proposal_id": "proposal.id"}'}
+                  </p>
+                  <textarea
+                    value={JSON.stringify(newOperation.input_mapping, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setNewOperation({ ...newOperation, input_mapping: JSON.parse(e.target.value) });
+                      } catch {}
+                    }}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                    rows={4}
+                    placeholder='{"body.message": "context.notification_message"}'
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Output Mapping (JSON, optional)</label>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Map response data back to proposal context. Format: {'{"context.last_notification_id": "response.id"}'}
+                  </p>
+                  <textarea
+                    value={JSON.stringify(newOperation.output_mapping, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setNewOperation({ ...newOperation, output_mapping: JSON.parse(e.target.value) });
+                      } catch {}
+                    }}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                    rows={4}
+                    placeholder='{"context.last_notification_id": "response.id"}'
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Timeout (seconds)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={newOperation.timeout}
+                      onChange={(e) => setNewOperation({ ...newOperation, timeout: parseInt(e.target.value) || 30 })}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Response Schema (JSON, optional)</label>
+                    <textarea
+                      value={JSON.stringify(newOperation.response_schema, null, 2)}
+                      onChange={(e) => {
+                        try {
+                          setNewOperation({ ...newOperation, response_schema: JSON.parse(e.target.value) });
+                        } catch {}
+                      }}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm"
+                      rows={3}
+                      placeholder='{"type": "object", "properties": {"id": {"type": "integer"}}}'
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNewOperationForm(false);
+                      setNewOperation({
+                        operation_id: '',
+                        name: '',
+                        description: '',
+                        method: 'POST',
+                        path: '',
+                        parameters: {},
+                        request_body: {},
+                        response_schema: {},
+                        input_mapping: {},
+                        output_mapping: {},
+                        timeout: 30,
+                        retry_config: {},
+                        tool_type: 'other',
+                        validation_config: {
+                          block_on_failure: true,
+                          block_on_service_error: false,
+                          failure_conditions: [],
+                          error_message_template: 'Validation failed',
+                        },
+                      });
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                  >
+                    Create Operation
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+

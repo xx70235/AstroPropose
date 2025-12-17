@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app import db
-from app.models.models import Proposal, ProposalPhase, ProposalInstrument, WorkflowState
+from app.models.models import Proposal, ProposalPhase, ProposalInstrument, WorkflowState, ExternalToolOperation
 
 
 class WorkflowEngine:
@@ -41,7 +41,7 @@ class WorkflowEngine:
         proposal = Proposal.query.get_or_404(proposal_id)
         transition = self._find_transition(proposal, action_name, context or {})
         self._authorize(transition, actor)
-        self._apply_transition(proposal, transition, context or {})
+        self._apply_transition(proposal, transition, context or {}, actor)
         self.db.commit()
         return {
             "status": "success",
@@ -102,7 +102,7 @@ class WorkflowEngine:
         if actor_roles.isdisjoint(roles_required):
             raise PermissionError("Insufficient role to execute transition.")
 
-    def _apply_transition(self, proposal: Proposal, transition: Dict[str, Any], context: Dict[str, Any]) -> None:
+    def _apply_transition(self, proposal: Proposal, transition: Dict[str, Any], context: Dict[str, Any], actor=None) -> None:
         target_state_name = transition.get("to")
         if target_state_name is None:
             raise ValueError("Transition target state missing.")
@@ -112,9 +112,9 @@ class WorkflowEngine:
         if target_state is None:
             raise ValueError(f"Workflow state {target_state_name} not found.")
         proposal.current_state = target_state
-        self._apply_effects(proposal, transition.get("effects") or {}, context)
+        self._apply_effects(proposal, transition.get("effects") or {}, context, actor)
 
-    def _apply_effects(self, proposal: Proposal, effects: Dict[str, Any], context: Dict[str, Any]) -> None:
+    def _apply_effects(self, proposal: Proposal, effects: Dict[str, Any], context: Dict[str, Any], actor=None) -> None:
         if not effects:
             return
         now = datetime.utcnow()
@@ -144,6 +144,117 @@ class WorkflowEngine:
                     assignment.confirmed_at = now
                 if instrument_effect.get("record_applicant_confirm_time"):
                     assignment.applicant_confirmed_at = now
+        
+        # 执行外部工具调用
+        if external_tools := effects.get("external_tools"):
+            self._execute_external_tools(external_tools, proposal, context, actor)
+    
+    def _execute_external_tools(
+        self,
+        tool_configs: List[Dict[str, Any]],
+        proposal: Proposal,
+        context: Dict[str, Any],
+        actor=None
+    ) -> None:
+        """
+        执行外部工具调用
+        
+        tool_configs 格式：
+        [
+            {
+                "operation_id": 1,  # ExternalToolOperation ID
+                "async": false,     # 是否异步执行
+                "on_failure": "continue"  # continue | abort | retry
+            }
+        ]
+        
+        对于验证类工具，如果验证失败且配置为阻止转换，将抛出 ValidationError
+        """
+        from app.core.external_tool_executor import ExternalToolExecutor
+        
+        executor = ExternalToolExecutor(self.db)
+        validation_errors = []  # 收集所有验证错误
+        
+        for tool_config in tool_configs:
+            operation_id = tool_config.get("operation_id")
+            if not operation_id:
+                continue
+            
+            # 检查操作是否存在
+            operation = ExternalToolOperation.query.get(operation_id)
+            if not operation or not operation.tool.is_active:
+                on_failure = tool_config.get("on_failure", "continue")
+                if on_failure == "abort":
+                    raise ValueError(f"External tool operation {operation_id} not found or inactive")
+                # 对于验证类工具，服务不可用可能也需要阻止
+                if operation and operation.tool_type == 'validation':
+                    validation_config = operation.validation_config or {}
+                    if validation_config.get('block_on_service_error', False):
+                        raise ValueError(
+                            f"Validation tool '{operation.name}' is unavailable. "
+                            f"Please try again later or contact support."
+                        )
+                continue
+            
+            try:
+                # TODO: 如果 async=True，应该使用任务队列（如 Celery）
+                # 目前实现同步调用
+                result = executor.execute(
+                    operation_id=operation_id,
+                    proposal=proposal,
+                    context=context,
+                    actor=actor,
+                    triggered_by=f"workflow_transition"
+                )
+                
+                # 处理验证失败
+                if result.get('status') == 'validation_failed':
+                    if result.get('block_transition', True):
+                        # 验证失败且配置为阻止转换
+                        error_msg = result.get('error', 'Validation failed')
+                        validation_errors.append({
+                            'tool': operation.name,
+                            'error': error_msg,
+                            'response': result.get('response'),
+                        })
+                    else:
+                        # 验证失败但不阻止，记录到 context
+                        context.setdefault('validation_warnings', []).append({
+                            'tool': operation.name,
+                            'error': result.get('error'),
+                        })
+                
+                # 处理服务错误
+                elif result.get('status') == 'service_error':
+                    if result.get('block_transition', False):
+                        raise ValueError(
+                            f"External tool '{operation.name}' is unavailable: {result.get('error')}. "
+                            f"Please try again later."
+                        )
+                    # 服务错误但不阻止，记录到 context
+                    context.setdefault('tool_errors', []).append({
+                        'tool': operation.name,
+                        'error': result.get('error'),
+                        'type': 'service_unavailable',
+                    })
+                
+                # 将输出合并到 context
+                if result.get("mapped_output"):
+                    context.update(result["mapped_output"])
+                    
+            except Exception as e:
+                on_failure = tool_config.get("on_failure", "continue")
+                if on_failure == "abort":
+                    raise ValueError(f"External tool execution failed: {str(e)}")
+                # continue: 忽略错误继续执行
+                # retry: 已在 executor 中处理
+        
+        # 如果有验证错误且需要阻止，抛出异常
+        if validation_errors:
+            error_messages = [err['error'] for err in validation_errors]
+            raise ValueError(
+                f"Validation failed:\n" + "\n".join(f"- {msg}" for msg in error_messages)
+            )
 
     def _evaluate_conditions(self, conditions: Dict[str, Any], proposal: Proposal, context: Optional[Dict[str, Any]] = None) -> bool:
         if not conditions:
@@ -174,4 +285,3 @@ class WorkflowEngine:
         if not roles_required:
             return True
         return not actor_roles.isdisjoint(set(roles_required))
-*** End Patch

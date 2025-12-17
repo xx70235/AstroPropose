@@ -42,6 +42,9 @@ def create_app(config_class=Config):
     from app.api.instruments import bp as instruments_bp
     app.register_blueprint(instruments_bp, url_prefix='/api/instruments', strict_slashes=False)
 
+    from app.api.external_tools import bp as external_tools_bp
+    app.register_blueprint(external_tools_bp, url_prefix='/api/external-tools', strict_slashes=False)
+
     @app.route('/ping')
     def ping():
         return 'pong!'
