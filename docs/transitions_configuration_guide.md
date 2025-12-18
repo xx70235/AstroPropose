@@ -256,3 +256,4 @@
 
 没有 Transitions Configuration，图形只是静态的展示，无法实际控制提案的状态转换。
 
+

@@ -281,3 +281,4 @@ These updates significantly enhance AstroPropose's capabilities, making it a rob
 **Last Updated**: December 2025  
 **Version**: 2.0 (CSST Support)
 
+

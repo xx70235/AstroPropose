@@ -44,3 +44,4 @@ A: The framework collects all validation errors and blocks the transition if any
 
 We will update Section 3.4 to include these error handling details.
 
+

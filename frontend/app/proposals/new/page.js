@@ -97,12 +97,29 @@ const SIMPLE_FIELD_RENDERERS = {
 // Repeatable field group component
 // instrumentTemplates: { [instrumentCode]: templateDefinition }
 // selectedInstruments: array of instrument codes
-function RepeatableFieldGroup({ field, value, onChange, instrumentTemplates = {}, selectedInstruments = [] }) {
+function RepeatableFieldGroup({ 
+  field, 
+  value, 
+  onChange, 
+  instrumentTemplates = {}, 
+  selectedInstruments = [],
+  toolLoading = {},
+  toolResult = {},
+  setToolLoading,
+  setToolResult,
+  executeToolOperationFromForm
+}) {
   // value is an array of entry objects
   const entries = Array.isArray(value) ? value : [];
-  const minEntries = field.minEntries || 1;
-  const maxEntries = field.maxEntries || 0; // 0 means unlimited
-  const subFields = field.subFields || [];
+  const minEntries = field.minEntries || field.min_entries || 1;
+  const maxEntries = field.maxEntries || field.max_entries || 0; // 0 means unlimited
+  // Support both camelCase and snake_case for sub-fields
+  const subFields = field.subFields || field.sub_fields || [];
+  
+  // Debug: log if subFields is empty
+  if (subFields.length === 0 && field.type === 'repeatable') {
+    console.warn('RepeatableFieldGroup: No sub-fields found for field', field.name, 'Field object:', field);
+  }
   
   // Check if any subfield is of type instrument_params
   const hasInstrumentParams = subFields.some(sf => sf.type === 'instrument_params');
@@ -303,6 +320,11 @@ function RepeatableFieldGroup({ field, value, onChange, instrumentTemplates = {}
         return;
       }
       
+      if (!setToolLoading || !setToolResult || !executeToolOperationFromForm) {
+        console.error('Tool execution functions not provided to RepeatableFieldGroup');
+        return;
+      }
+      
       const toolKey = `${entryIndex}_${fieldName}`;
       setToolLoading(prev => ({ ...prev, [toolKey]: true }));
       try {
@@ -434,9 +456,17 @@ function RepeatableFieldGroup({ field, value, onChange, instrumentTemplates = {}
               </button>
             )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {subFields.map((subField) => renderSubField(subField, entry, entryIndex))}
-          </div>
+          {subFields.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {subFields.map((subField) => renderSubField(subField, entry, entryIndex))}
+            </div>
+          ) : (
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+              <p className="text-xs text-yellow-700">
+                ⚠️ No sub-fields defined for this repeatable group. Please check the form template configuration.
+              </p>
+            </div>
+          )}
         </div>
       ))}
       {canAdd && (
@@ -457,7 +487,19 @@ function RepeatableFieldGroup({ field, value, onChange, instrumentTemplates = {}
   );
 }
 
-function DynamicField({ field, value, onChange, onFileChange, instrumentTemplates, selectedInstruments }) {
+function DynamicField({ 
+  field, 
+  value, 
+  onChange, 
+  onFileChange, 
+  instrumentTemplates, 
+  selectedInstruments,
+  toolLoading,
+  toolResult,
+  setToolLoading,
+  setToolResult,
+  executeToolOperationFromForm
+}) {
   // Handle repeatable fields specially
   if (field.type === 'repeatable') {
     return (
@@ -472,6 +514,11 @@ function DynamicField({ field, value, onChange, onFileChange, instrumentTemplate
           onChange={onChange}
           instrumentTemplates={instrumentTemplates}
           selectedInstruments={selectedInstruments}
+          toolLoading={toolLoading}
+          toolResult={toolResult}
+          setToolLoading={setToolLoading}
+          setToolResult={setToolResult}
+          executeToolOperationFromForm={executeToolOperationFromForm}
         />
         {field.helpText && <p className="mt-1 text-xs text-gray-500">{field.helpText}</p>}
       </div>
@@ -777,6 +824,11 @@ export default function NewProposalPage() {
                     onFileChange={(fieldName, file) => handlePhaseFileChange('phase1', fieldName, file)}
                     instrumentTemplates={instrumentTemplates}
                     selectedInstruments={selectedInstruments}
+                    toolLoading={toolLoading}
+                    toolResult={toolResult}
+                    setToolLoading={setToolLoading}
+                    setToolResult={setToolResult}
+                    executeToolOperationFromForm={executeToolOperationFromForm}
                   />
                 ))}
             </div>
@@ -834,6 +886,11 @@ export default function NewProposalPage() {
                           onFileChange={(fieldName, file) => handleInstrumentFileChange(code, fieldName, file)}
                           instrumentTemplates={instrumentTemplates}
                           selectedInstruments={selectedInstruments}
+                          toolLoading={toolLoading}
+                          toolResult={toolResult}
+                          setToolLoading={setToolLoading}
+                          setToolResult={setToolResult}
+                          executeToolOperationFromForm={executeToolOperationFromForm}
                         />
                       ))}
                     </div>
